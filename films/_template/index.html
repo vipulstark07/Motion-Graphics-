@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Template</title>
+<style>
+  /* One display face, one UI face, one accent. Vendor real font files into
+     fonts/ with @font-face; the stacks below are fallbacks. */
+  :root {
+    --bg: #0f0f0d;
+    --ink: #f2efe6;
+    --accent: #ff4d1f;
+    --display: 'Archivo Black', 'Arial Black', 'DejaVu Sans', sans-serif;
+    --ui: 'JetBrains Mono', 'DejaVu Sans Mono', monospace;
+  }
+  html, body { margin: 0; background: var(--bg); overflow: hidden; }
+  #stage { position: relative; width: 1080px; height: 1920px; overflow: hidden; color: var(--ink); font-family: var(--display); }
+  .group { position: absolute; inset: 0; }
+  .mask { position: absolute; overflow: hidden; white-space: nowrap; line-height: 1.05; font-weight: 800; letter-spacing: -0.035em; }
+  .mask > span { display: block; }
+  .ui { font-family: var(--ui); font-weight: 400; letter-spacing: 0; }
+  .accent { color: var(--accent); }
+  .bar { position: absolute; bottom: 440px; width: 30px; transform-origin: bottom; }
+  .tick { position: absolute; width: 3px; background: var(--ink); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script type="module">
+  // Render contract: seek(t) sets every animated property from t alone.
+  // Elements are built once at load; nothing is remembered between frames.
+  import { noise1 } from '/lib/rand.js';
+  import { clamp, lerp, progress, ease, beatIndex } from '/lib/time.js';
+
+  const film = await (await fetch('film.json')).json();
+  const { beats } = await (await fetch('beats.json')).json();
+  const B = (i) => beats[Math.min(i, beats.length - 1)];
+  const M = 72, W = film.width - 2 * M;
+
+  const stage = document.getElementById('stage');
+  const el = (html, parent = stage) => {
+    const t = document.createElement('template');
+    t.innerHTML = html.trim();
+    return parent.appendChild(t.content.firstChild);
+  };
+  const group = () => el('<div class="group"></div>');
+  const line = (parent, text, y, size, cls = '') =>
+    el(`<div class="mask ${cls}" style="left:${M}px;top:${y}px;font-size:${size}px"><span>${text}</span></div>`, parent);
+
+  // Masked slam: the line rises out of its own baseline and LANDS on the beat
+  // (starts 0.12s early), so a slam on beat 0 is already readable at frame 0.
+  const slam = (m, t, beat, dur = 0.3) => {
+    m.firstChild.style.transform = `translateY(${(1 - ease.outExpo(progress(t, beat - 0.12, dur))) * 105}%)`;
+  };
+  const moveY = (g, y) => { g.style.transform = `translateY(${y}px)`; };
+  // Exits lead the beat so the frame is clear when the next slam lands.
+  const exit = (t, beat) => ease.outExpo(progress(t, beat - 0.2, 0.45));
+
+  // 0-3s: hook. Four words slam in on the first four beats.
+  const s0 = group();
+  const words = ['Every', 'frame', 'is a', 'function'].map((w, i) => line(s0, w, 260 + i * 200, 190));
+  const underline = el(`<div style="position:absolute;left:${M}px;top:1080px;width:${W}px;height:26px;background:var(--accent);transform-origin:left"></div>`, s0);
+
+  // 3-6s: payoff line.
+  const s1 = group();
+  const of = line(s1, 'of', 380, 340, 'accent');
+  const time = line(s1, 'time.', 720, 340);
+
+  // From 4s: timeline UI, the one piece of chrome.
+  const tl = group();
+  for (let i = 0; i < beats.length; i++)
+    el(`<div class="tick" style="left:${M + (W * B(i)) / film.duration}px;top:${1700 - (i % 4 ? 24 : 48)}px;height:${i % 4 ? 24 : 48}px"></div>`, tl);
+  el(`<div style="position:absolute;left:${M}px;top:1700px;width:${W}px;height:3px;background:var(--ink)"></div>`, tl);
+  const head = el(`<div style="position:absolute;top:1620px;width:6px;height:110px;background:var(--accent)"></div>`, tl);
+  const clock = el(`<div class="ui" style="position:absolute;left:${M}px;top:1550px;font-size:46px"></div>`, tl);
+  const count = el(`<div class="ui" style="position:absolute;right:${M}px;top:1550px;font-size:46px"></div>`, tl);
+
+  // 6-9s: one bar per beat, growing as its beat lands.
+  const s2 = group();
+  const caption = line(s2, 'seek(t) &rarr; frame', 300, 64, 'ui');
+  const bars = beats.map((_, i) => el(`<div class="bar" style="left:${M + i * (W / beats.length) + 4}px"></div>`, s2));
+
+  // 9-12s: the claim, then the end card.
+  const s3 = group();
+  const same = [['Same t.', 18], ['Same', 20], ['frame.', 21]].map(([w, b], i) => [line(s3, w, 360 + i * 230, 220), b]);
+  const card = el(`<div style="position:absolute;left:0;right:0;bottom:0;background:var(--accent);overflow:hidden"></div>`);
+  el(`<div class="mask" style="left:${M}px;bottom:${M}px;font-size:170px;color:var(--bg)"><span>seek(t)</span></div>`, card);
+
+  window.seek = (t) => {
+    words.forEach((w, i) => slam(w, t, B(i)));
+    underline.style.transform = `scaleX(${ease.outExpo(progress(t, B(4), 0.4))})`;
+    moveY(s0, -1300 * exit(t, B(6)));
+
+    slam(of, t, B(6));
+    slam(time, t, B(7));
+    moveY(s1, -1300 * exit(t, B(12)));
+
+    const reveal = ease.outExpo(progress(t, B(8), 0.5));
+    tl.style.clipPath = `inset(0 ${(1 - reveal) * 100}% 0 0)`;
+    head.style.left = `${M + (W * clamp(t / film.duration)) - 3}px`;
+    clock.textContent = `t = ${t.toFixed(2).padStart(5, '0')} s`;
+    count.textContent = `beat ${String(beatIndex(beats, t) + 1).padStart(2, '0')}/${beats.length}`;
+
+    slam(caption, t, B(12));
+    moveY(caption, -400 * ease.inExpo(progress(t, B(18) - 0.3, 0.3)));
+    const now = beatIndex(beats, t);
+    bars.forEach((b, i) => {
+      const grow = ease.outBack(progress(t, Math.max(B(i), B(12) + i * 0.03), 0.3));
+      const fall = 1 - ease.outCubic(progress(t, B(18) - 0.3 + i * 0.006, 0.25));
+      const h = 260 + 760 * noise1(11, i * 0.45) * lerp(0.94, 1.06, noise1(40 + i, t * 1.5));
+      b.style.height = `${h}px`;
+      b.style.transform = `scaleY(${Math.max(0, grow * fall)})`;
+      b.style.background = i === now ? 'var(--accent)' : 'var(--ink)';
+    });
+
+    same.forEach(([m, b]) => slam(m, t, B(b)));
+    card.style.height = `${860 * ease.outExpo(progress(t, B(22), 0.4))}px`;
+    slam(card.firstChild, t, B(22) + 0.08);
+  };
+</script>
+</body>
+</html>
