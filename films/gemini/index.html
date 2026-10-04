@@ -1,0 +1,445 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Gemini — Twins</title>
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>
+  /* Display: Google Sans Flex (variable: wght, wdth, opsz, ROND). UI: Google Sans Code.
+     One accent: the Gemini gradient. Every block of type hangs off the same 120px left axis. */
+  :root {
+    --bg: #0b0c10;
+    --ink: #eef0f6;
+    --paper: #f3f2ee;
+    --ink2: #101218;
+    --g0: #4796e3;
+    --g1: #9177c7;
+    --g2: #ca6673;
+    --display: 'Google Sans Flex', sans-serif;
+    --ui: 'Google Sans Code', monospace;
+  }
+  html, body { margin: 0; background: var(--bg); overflow: hidden; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); }
+  #cam { position: absolute; inset: -20px; }
+  #cam > * { position: absolute; left: 20px; top: 20px; width: 1920px; height: 1080px; }
+  .layer { font-family: var(--display); color: var(--ink); }
+  .mask { position: absolute; overflow: hidden; white-space: nowrap; line-height: 1.12; }
+  .mask > span, .ch { display: inline-block; }
+  .ui { font-family: var(--ui); font-weight: 400; letter-spacing: 0.01em; }
+  .grad { background: linear-gradient(90deg, var(--g0), var(--g1) 55%, var(--g2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .dark { color: var(--ink2); }
+
+  #tiles { position: absolute; left: 120px; top: 600px; display: flex; gap: 36px; perspective: 1400px; }
+  .tile { width: 300px; height: 330px; border-radius: 28px; background: var(--ink2); color: var(--ink); position: relative; transform-origin: 50% 0; }
+  .tile svg { position: absolute; left: 36px; top: 40px; width: 132px; height: 132px; overflow: visible; }
+  .tile svg * { fill: none; stroke: url(#gg); stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; }
+  .tile .label { position: absolute; left: 36px; bottom: 34px; font-size: 48px; }
+  .tile .num { position: absolute; right: 30px; top: 34px; font-size: 30px; color: #8a8f9c; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs><linearGradient id="gg" x1="0" y1="1" x2="1" y2="0">
+    <stop offset="0" stop-color="#4796e3"/><stop offset=".55" stop-color="#9177c7"/><stop offset="1" stop-color="#ca6673"/>
+  </linearGradient></defs>
+</svg>
+<div id="stage"><div id="cam">
+  <canvas id="c" width="1920" height="1080"></canvas>
+
+  <!-- B: wordmark + kicker -->
+  <div class="layer" id="L-word">
+    <div class="mask" id="wm" style="left:104px;top:600px;font-size:340px"></div>
+    <div class="ui" id="kick1" style="position:absolute;left:124px;top:505px;font-size:64px;color:#a9aebb"></div>
+  </div>
+
+  <!-- C: modes -->
+  <div class="layer" id="L-modes">
+    <div class="ui" id="kick2" style="position:absolute;left:124px;top:290px;font-size:64px;color:#a9aebb"></div>
+    <div class="mask" id="slot" style="left:112px;top:380px;font-size:240px;height:269px">
+      <span id="slotcol"></span>
+    </div>
+    <div id="segs" style="position:absolute;left:124px;top:720px"></div>
+    <div class="ui" id="count" style="position:absolute;left:124px;top:756px;font-size:60px"></div>
+  </div>
+
+  <!-- D: light section -->
+  <div class="layer dark" id="L-light">
+    <div class="mask" id="one" style="left:108px;top:110px;font-size:210px"><span>One model.</span></div>
+    <div class="mask" id="every" style="left:108px;top:330px;font-size:210px"><span>Every <span class="grad">mode.</span></span></div>
+    <div id="tiles"></div>
+  </div>
+
+  <!-- E: rapid fire -->
+  <div class="layer" id="L-see"><div class="mask" style="left:100px;top:250px;font-size:520px"><span>See.</span></div></div>
+  <div class="layer dark" id="L-hear"><div class="mask" style="right:110px;top:20px;font-size:520px;text-align:right"><span>Hear.</span></div></div>
+  <div class="layer dark" id="L-read">
+    <div class="mask" style="left:100px;top:0px;font-size:520px"><span>Read.</span></div>
+    <div id="prompts" class="ui" style="position:absolute;left:124px;top:640px;width:1700px;height:400px;overflow:hidden;font-size:50px;line-height:76px"></div>
+  </div>
+  <div class="layer" id="L-code"><div class="mask" style="left:100px;top:250px;font-size:520px"><span class="grad">Code.</span></div></div>
+
+  <!-- F: end card -->
+  <div class="layer" id="L-end">
+    <div class="mask" id="wm2" style="left:500px;top:350px;font-size:270px"></div>
+    <div class="ui" id="tag" style="position:absolute;left:520px;top:690px;font-size:64px;color:#c9cdd8"></div>
+  </div>
+</div></div>
+
+<script type="module">
+  // Render contract: seek(t) sets every property from t alone. Nothing below
+  // remembers a previous frame; every element's state is recomputed each call.
+  import { hash, noise1 } from '/lib/rand.js';
+  import { clamp, lerp, progress, ease, beatIndex } from '/lib/time.js';
+
+  const film = await (await fetch('film.json')).json();
+  const grid = await (await fetch('beats.json')).json();
+  const beats = grid.beats, SPB = 60 / grid.bpm, last = beats.length - 1;
+  // Fractional beat -> seconds on the measured grid.
+  const bt = (x) => {
+    if (x <= 0) return x * SPB;
+    if (x >= last) return beats[last] + (x - last) * SPB;
+    const i = Math.floor(x);
+    return beats[i] + (x - i) * (beats[i + 1] - beats[i]);
+  };
+  await Promise.all([document.fonts.load("500 100px 'Google Sans Flex'"), document.fonts.load("400 50px 'Google Sans Code'")]);
+
+  const W = 1920, H = 1080, X0 = 120;
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  const $ = (id) => document.getElementById(id);
+  const { PI, sin, cos, exp, log, max, min, hypot } = Math;
+
+  // ---------- colour ----------
+  const STOPS = [[0x47, 0x96, 0xe3], [0x91, 0x77, 0xc7], [0xca, 0x66, 0x73]];
+  const PAL = Array.from({ length: 65 }, (_, i) => {
+    const k = (i / 64) * 2, j = min(1, Math.floor(k)), f = k - j, a = STOPS[j], b = STOPS[j + 1];
+    return `rgb(${a.map((v, c) => Math.round(v + (b[c] - v) * f)).join(',')})`;
+  });
+  const gcol = (u) => PAL[Math.round(clamp(u) * 64)];
+  const diagGrad = (x0, y0, x1, y1) => {
+    const g = ctx.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, '#4796e3'); g.addColorStop(0.55, '#9177c7'); g.addColorStop(1, '#ca6673');
+    return g;
+  };
+
+  // ---------- rhythm ----------
+  // Kick envelope: 1 on each beat, decaying. Pure: depends only on t.
+  const pulse = (t) => { const i = beatIndex(beats, t); return i < 0 ? 0 : exp(-(t - beats[i]) / 0.11); };
+  const IMPACTS = [[4, 9], [28, 16]];
+  const shake = (t) => IMPACTS.reduce(([x, y], [b, a]) => {
+    const d = t - bt(b);
+    if (d < 0 || d > 0.6) return [x, y];
+    const e = a * exp(-d * 9);
+    return [x + e * sin(d * 73 + b), y + e * cos(d * 61 + b * 2)];
+  }, [0, 0]);
+
+  // ---------- the sparkle ----------
+  const WAIST = 0.06; // control point distance: how deep the four sides curve in
+  function starPath(x, y, r, rot) {
+    ctx.beginPath();
+    for (let k = 0; k < 4; k++) {
+      const a0 = rot + k * PI / 2 - PI / 2, a1 = a0 + PI / 2, am = a0 + PI / 4;
+      if (k === 0) ctx.moveTo(x + r * cos(a0), y + r * sin(a0));
+      ctx.quadraticCurveTo(x + r * WAIST * cos(am), y + r * WAIST * sin(am), x + r * cos(a1), y + r * sin(a1));
+    }
+    ctx.closePath();
+  }
+  function star(x, y, r, rot, fill) {
+    if (r <= 0.5) return;
+    starPath(x, y, r, rot);
+    const R = min(r, 900);
+    ctx.fillStyle = fill ?? diagGrad(x - R, y + R, x + R, y - R);
+    ctx.fill();
+  }
+  function ring(x, y, t, t0, r0, grow = 520, dur = 0.9) {
+    const k = progress(t, t0, dur);
+    if (k <= 0 || k >= 1) return;
+    ctx.beginPath();
+    ctx.arc(x, y, r0 + grow * ease.outCubic(k), 0, PI * 2);
+    ctx.lineWidth = 4 * (1 - k) ** 1.5;
+    ctx.strokeStyle = diagGrad(x - r0 - grow, y + r0 + grow, x + r0 + grow, y - r0 - grow);
+    ctx.stroke();
+  }
+
+  // ---------- dot shapes (unit space, 360 points) ----------
+  const N = 192;
+  function sample(polys, fixed = false) {
+    const out = new Float32Array(N * 2);
+    const runs = polys.map((p) => {
+      const pts = p.closed ? [...p.pts, p.pts[0]] : p.pts, segs = [];
+      let len = 0;
+      for (let i = 1; i < pts.length; i++) { const L = hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push([pts[i - 1], pts[i], L]); len += L; }
+      return { segs, len };
+    });
+    const total = runs.reduce((a, r) => a + r.len, 0);
+    let j = 0;
+    runs.forEach((r, ri) => {
+      const count = ri === runs.length - 1 ? N - j : Math.round(fixed ? N / runs.length : (N * r.len) / total);
+      let si = 0, acc = 0;
+      for (let c = 0; c < count; c++, j++) {
+        const d = ((c + 0.5) / count) * r.len;
+        while (si < r.segs.length - 1 && acc + r.segs[si][2] < d) acc += r.segs[si++][2];
+        const [a, b, L] = r.segs[si], k = L ? (d - acc) / L : 0;
+        out[2 * j] = a[0] + (b[0] - a[0]) * k;
+        out[2 * j + 1] = a[1] + (b[1] - a[1]) * k;
+      }
+    });
+    return out;
+  }
+  const circle = (cx, cy, r, n = 40) => ({ closed: true, pts: Array.from({ length: n }, (_, i) => [cx + r * cos((i / n) * PI * 2), cy + r * sin((i / n) * PI * 2)]) });
+  const rect = (x0, y0, x1, y1) => ({ closed: true, pts: [[x0, y0], [x1, y0], [x1, y1], [x0, y1]] });
+  const STAR = sample([{ closed: true, pts: Array.from({ length: 4 * 60 }, (_, n) => {
+    const k = Math.floor(n / 60), s = (n % 60) / 60, a0 = k * PI / 2 - PI / 2, a1 = a0 + PI / 2, am = a0 + PI / 4;
+    const p0 = [cos(a0), sin(a0)], p1 = [cos(a1), sin(a1)], c = [WAIST * cos(am), WAIST * sin(am)];
+    return [0, 1].map((d) => (1 - s) ** 2 * p0[d] + 2 * (1 - s) * s * c[d] + s * s * p1[d]);
+  }) }]);
+  const SHAPES = {
+    star: () => STAR,
+    text: (() => { const s = sample([[-0.62, 0.95], [-0.31, 0.72], [0, 1], [0.31, 0.5], [0.62, 0.84]].map(([y, l]) => ({ pts: [[-1, y], [-1 + 2 * l, y]] }))); return () => s; })(),
+    code: (() => { const s = sample([{ pts: [[-0.38, -0.55], [-0.98, 0], [-0.38, 0.55]] }, { pts: [[0.16, -0.72], [-0.16, 0.72]] }, { pts: [[0.38, -0.55], [0.98, 0], [0.38, 0.55]] }]); return () => s; })(),
+    image: (() => { const s = sample([rect(-1, -0.72, 1, 0.72), { pts: [[-1, 0.62], [-0.42, -0.02], [-0.08, 0.34], [0.3, -0.2], [1, 0.5]] }, circle(0.48, -0.38, 0.14, 24)]); return () => s; })(),
+    audio: (t) => sample(Array.from({ length: 12 }, (_, i) => {
+      const x = -0.94 + i * (1.88 / 11), hann = sin(PI * (i + 0.5) / 12);
+      const h = 0.12 + 0.85 * hann * (0.35 + 0.4 * noise1(30 + i, t * 3.2) + 0.35 * pulse(t));
+      return { pts: [[x, -h], [x, h]] };
+    }), true),
+    video: (() => { const s = sample([rect(-1, -0.62, 1, 0.62), { closed: true, pts: [[-0.2, -0.3], [0.32, 0], [-0.2, 0.3]] }]); return () => s; })(),
+  };
+
+  // Morph schedule for the modes section (beats). Each point unspools along the
+  // path with a small delay, and even/odd points curl opposite ways: a double helix.
+  const MORPHS = [[8.5, 'text'], [10, 'code'], [11.5, 'image'], [13, 'audio'], [14.5, 'video'], [15.5, 'star']];
+  const MDUR = 0.26, MSTAG = 0.08, MLEAD = 0.28; // morphs start MLEAD early so they land on the beat
+  function morphPoints(t) {
+    const out = new Float32Array(N * 2);
+    const starts = MORPHS.map(([b]) => bt(b) - MLEAD);
+    const shapesAt = MORPHS.map(([, s]) => SHAPES[s](t));
+    for (let j = 0; j < N; j++) {
+      const dj = (j / N) * MSTAG;
+      let k = -1;
+      for (let m = 0; m < starts.length; m++) if (t >= starts[m] + dj) k = m;
+      const to = k < 0 ? STAR : shapesAt[k], from = k <= 0 ? STAR : shapesAt[k - 1];
+      const p = k < 0 ? 1 : ease.inOutCubic(progress(t, starts[k] + dj, MDUR));
+      const ax = from[2 * j], ay = from[2 * j + 1], bx = to[2 * j], by = to[2 * j + 1];
+      const curl = sin(PI * p) * 0.22 * (j % 2 ? 1 : -1);
+      out[2 * j] = ax + (bx - ax) * p - (by - ay) * curl;
+      out[2 * j + 1] = ay + (by - ay) * p + (bx - ax) * curl;
+    }
+    return out;
+  }
+  function dots(pts, cx, cy, S, rad, reveal = 1) {
+    for (let j = 0; j < N; j++) {
+      const x = cx + pts[2 * j] * S, y = cy + pts[2 * j + 1] * S;
+      const r = rad * (reveal >= 1 ? 1 : ease.outBack(clamp((reveal * 1.6 - (j / N) * 0.6))));
+      if (r <= 0.2) continue;
+      ctx.fillStyle = gcol((x - cx + S) / (2 * S));
+      ctx.beginPath(); ctx.arc(x, y, r, 0, PI * 2); ctx.fill();
+    }
+  }
+
+  // ---------- DOM builders (once, at load) ----------
+  const letters = (el, word, cls = 'ch') => [...word].map((c) => {
+    const s = document.createElement('span'); s.className = cls; s.textContent = c; el.appendChild(s); return s;
+  });
+  const wm = letters($('wm'), 'Gemini');
+  const wm2 = letters($('wm2'), 'Gemini');
+  const MODES = ['Text', 'Code', 'Images', 'Audio', 'Video'];
+  const slotWords = MODES.map((m) => { const d = document.createElement('div'); d.textContent = m; d.style.height = '1.12em'; $('slotcol').appendChild(d); return d; });
+  const segs = MODES.map((_, i) => { const d = document.createElement('div'); Object.assign(d.style, { position: 'absolute', left: `${i * 134}px`, top: '0', width: '120px', height: '6px', borderRadius: '3px' }); $('segs').appendChild(d); return d; });
+  const ICONS = [
+    '<path pathLength="1" d="M10 22H90M10 42H78M10 62H90M10 82H56"/>',
+    '<path pathLength="1" d="M34 20L8 50L34 80"/><path pathLength="1" d="M66 20L92 50L66 80"/><path pathLength="1" d="M58 12L42 88"/>',
+    '<rect pathLength="1" x="6" y="16" width="88" height="68" rx="10"/><path pathLength="1" d="M6 74L36 46L54 64L68 52L94 76"/><circle pathLength="1" cx="70" cy="34" r="8"/>',
+    '<path pathLength="1" d="M14 40V60M30 24V76M46 34V66M62 12V88M78 30V70M94 44V56"/>',
+    '<rect pathLength="1" x="4" y="18" width="92" height="64" rx="12"/><path pathLength="1" d="M42 36L64 50L42 64Z"/>',
+  ];
+  const tiles = MODES.map((m, i) => {
+    const d = document.createElement('div'); d.className = 'tile';
+    d.innerHTML = `<svg viewBox="0 0 100 100">${ICONS[i]}</svg><div class="label ui">${m}</div><div class="num ui">0${i + 1}</div>`;
+    $('tiles').appendChild(d); return d;
+  });
+  const PROMPTS = ['> summarize this 40-page report', '> what changed between these photos?', '> translate this voice memo', '> find the bug in this function',
+    '> turn the whiteboard into a plan', '> what happens at 02:14 in the clip?', '> draft a reply in my voice', '> compare these two charts'];
+  $('prompts').innerHTML = `<div id="pcol">${[...PROMPTS, ...PROMPTS].map((p) => `<div>${p}</div>`).join('')}</div>`;
+
+  // ---------- small helpers for seek ----------
+  const show = (id, on) => { $(id).style.visibility = on ? 'visible' : 'hidden'; };
+  const fvs = (el, wght, wdth = 100) => { el.style.fontVariationSettings = `'wght' ${wght.toFixed(1)}, 'wdth' ${wdth.toFixed(1)}`; };
+  // Masked rise that LANDS on `beatT` (starts 0.1 s before it).
+  const rise = (el, t, beatT, dur = 0.34) => (1 - ease.outExpo(progress(t, beatT - 0.1, dur))) * 110;
+  const drop = (t, t0, dur = 0.3) => ease.inExpo(progress(t, t0, dur)) * 110;
+  const type = (s, t, t0, cps) => s.slice(0, clamp(Math.floor((t - t0) * cps), 0, s.length));
+
+  // Stretch slam for the rapid-fire cards: width 25 -> 100, weight 900 -> 640.
+  function slamWord(id, t, t0) {
+    const span = $(id).querySelector('.mask > span');
+    const k = ease.outExpo(progress(t, t0 - 0.06, 0.3));
+    span.style.transform = `translateY(${(1 - ease.outExpo(progress(t, t0 - 0.08, 0.16))) * 100}%)`;
+    fvs(span, lerp(900, 640, k), lerp(25, 100, k));
+  }
+
+  window.seek = (t) => {
+    const T = (b) => bt(b);
+    const [sx, sy] = shake(t);
+    $('cam').style.transform = `translate(${sx.toFixed(2)}px, ${sy.toFixed(2)}px)`;
+    const pl = pulse(t);
+
+    // ===== canvas =====
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    let bg = '#0b0c10';
+    if (t >= T(18) - 0.02 && t < T(24)) bg = '#f3f2ee';
+    if (t >= T(25) && t < T(26)) bg = '#f3f2ee';
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    if (t >= T(26) && t < T(27)) { ctx.fillStyle = diagGrad(0, H, W, 0); ctx.fillRect(0, 0, W, H); }
+
+    const C = [1440, 420], F = [1360, 560];
+    if (t < T(8)) {
+      // A: hook. Log-space pull-back from an extreme macro of the sparkle.
+      const e = ease.outCubic(progress(t, 0, T(3)));
+      const r = exp(lerp(log(3200), log(230), e)), rot = lerp(-1.15, 0, e) + 0.04 * sin(t * 2);
+      const cx = lerp(980, C[0], e), cy = lerp(1500, C[1], e);
+      // Orbit path draws on (b2), then retracts as the twins merge (b7-8).
+      const drawOn = ease.inOutCubic(progress(t, T(2), T(3.5) - T(2))), retract = ease.inOutCubic(progress(t, T(7), T(8) - T(7)));
+      if (drawOn > retract) {
+        ctx.save(); ctx.translate(C[0], C[1]); ctx.rotate(-0.21);
+        ctx.beginPath(); ctx.ellipse(0, 0, 360, 120, 0, PI * 2 * retract - PI / 2, PI * 2 * drawOn - PI / 2);
+        ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(238,240,246,.45)'; ctx.stroke(); ctx.restore();
+      }
+      ring(C[0], C[1], t, T(2), 120, 420);
+      ring(C[0], C[1], t, T(3), 120, 520);
+      if (t < T(4)) star(cx, cy, r, rot);
+      else {
+        // B: the sparkle splits into twins that orbit the same path, then merge back at F.
+        const split = 360 * ease.outExpo(progress(t, T(4) - 0.04, 0.5));
+        const phi = PI * ease.inOutCubic(progress(t, T(4), T(7.25) - T(4))) - 0.2 * (1 - ease.outExpo(progress(t, T(4), 0.4)));
+        const m = ease.inOutCubic(progress(t, T(7.25), T(8) - T(7.25)));
+        const cc = [lerp(C[0], F[0], m), lerp(C[1], F[1], m)];
+        const rr = lerp(lerp(230, 140, ease.outExpo(progress(t, T(4), 0.5))), 300, m);
+        const twin = (s) => {
+          const ex = s * split * (1 - m) * cos(phi), ey = s * split * (1 - m) * 0.333 * sin(phi);
+          const [rx, ry] = [ex * cos(-0.21) - ey * sin(-0.21), ex * sin(-0.21) + ey * cos(-0.21)];
+          return [cc[0] + rx, cc[1] + ry, s * sin(phi)];
+        };
+        const pair = [twin(1), twin(-1)].sort((a, b) => a[2] - b[2]); // back one first
+        pair.forEach(([x, y, z], i) => star(x, y, rr * (1 + 0.08 * z * (1 - m)), phi * (i ? 0.5 : -0.5) * (1 - m)));
+      }
+    } else if (t < T(17.5)) {
+      // C: dots. The fill collapses to reveal the dotted outline, which then morphs.
+      const fillIn = 1 - ease.outExpo(progress(t, T(8), 0.4)), refill = ease.outExpo(progress(t, T(15.5) + 0.25, 0.35));
+      // Anticipation: the star gathers (shrinks, counter-turns) for half a beat, then dives.
+      const zoom = ease.inExpo(progress(t, T(16.5), T(17.5) - T(16.5)));
+      const gather = sin(PI * ease.inOutCubic(progress(t, T(15.75), T(16.75) - T(15.75)))), gs = 1 - 0.22 * gather;
+      const r = 300 * gs * exp(log(26) * zoom), rot = (PI / 2) * zoom - 0.35 * gather;
+      const cx = lerp(F[0], 960, zoom), cy = lerp(F[1], 540, zoom);
+      const dotR = (7 + 3 * pl) * (1 - ease.outCubic(progress(t, T(15.5) + 0.3, 0.3)));
+      if (dotR > 0.2) dots(morphPoints(t), F[0], F[1], 300 * gs, dotR);
+      star(cx, cy, r * max(fillIn, refill), rot);
+    } else if (t < T(24)) {
+      // Iris: a paper sparkle opens from the centre of the gradient.
+      if (t < T(18) + 0.6) {
+        ctx.fillStyle = diagGrad(0, H, W, 0); ctx.fillRect(0, 0, W, H);
+        star(960, 540, 3400 * ease.outExpo(progress(t, T(17.5), 0.6)), PI / 4 * (1 - progress(t, T(17.5), 0.6)), '#f3f2ee');
+      }
+    } else if (t < T(25)) {
+      // See.: the image dots scatter in.
+      dots(SHAPES.image(t), 1500, 560, 290, 8 + 3 * pl, progress(t, T(24) - 0.2, 0.3));
+    } else if (t < T(26)) {
+      // Hear.: full-width waveform, driven by the kick envelope and seeded noise.
+      const n = 46, bw = (W - 2 * X0) / n;
+      for (let i = 0; i < n; i++) {
+        const hann = sin(PI * (i + 0.5) / n);
+        const h = 40 + 420 * hann * (0.3 + 0.45 * noise1(60 + i, t * 4) + 0.4 * pl) * ease.outBack(progress(t, T(25) - 0.16 + i * 0.003, 0.25));
+        ctx.fillStyle = gcol(i / n);
+        ctx.beginPath(); ctx.roundRect(X0 + i * bw + 4, 780 - h / 2, bw - 8, h, (bw - 8) / 2); ctx.fill();
+      }
+    } else if (t >= T(27) && t < T(27.5)) {
+      // Code.: the code dots, right.
+      dots(SHAPES.code(t), 1610, 560, 220, 8 + 3 * pl, progress(t, T(27) - 0.16, 0.22));
+    } else if (t >= T(27.5)) {
+      // F: twins streak in from opposite corners and fuse at P.
+      const P = [300, 540];
+      const p = ease.inCubic(progress(t, T(27.5), T(28) - T(27.5)));
+      if (t < T(28)) {
+        // Motion trail: the same pure path sampled a few ms back, fading.
+        for (let k = 12; k >= 0; k--) {
+          const q = ease.inCubic(progress(t - k * 0.006, T(27.5) - 0.08, T(28) - T(27.5) + 0.08));
+          const arc = (x0, y0, s) => [lerp(x0, P[0], q) + s * 220 * sin(PI * q), lerp(y0, P[1], q) - s * 160 * sin(PI * q)];
+          const [ax, ay] = arc(110, 150, 1), [bx, by] = arc(1810, 930, -1);
+          ctx.globalAlpha = k ? 0.22 * (1 - k / 13) : 1;
+          star(ax, ay, 150, (1 - q) * 5); star(bx, by, 150, -(1 - q) * 5);
+        }
+        ctx.globalAlpha = 1;
+      } else {
+        ring(P[0], P[1], t, T(28), 160, 700, 1.1);
+        ring(P[0], P[1], t, T(28) + 0.12, 160, 1100, 1.3);
+        const settle = ease.outBack(progress(t, T(28), 0.5));
+        const r = 150 * lerp(1.5, 1, settle) * (1 + 0.05 * pl);
+        star(P[0], P[1], r, -0.6 * (1 - settle) + 0.18 * (noise1(5, t * 0.8) - 0.5) + (PI / 2) * ease.inOutCubic(progress(t, T(31), 0.5)));
+      }
+    }
+
+    // ===== DOM =====
+    // B: wordmark, letter by letter on 8ths, weight punching 900 -> 520.
+    show('L-word', t >= T(4) - 0.15 && t < T(8) + 0.3);
+    wm.forEach((s, i) => {
+      const hit = T(4 + i * 0.5);
+      s.style.transform = `translateY(${rise(s, t, hit, 0.3) + drop(t, T(7.75) + i * 0.03, 0.28)}%)`;
+      fvs(s, lerp(900, 520, ease.outCubic(progress(t, hit, 0.45))));
+    });
+    $('kick1').textContent = type('gemini (lat.) — twins', t, T(5), 46) + (t >= T(5) && t < T(8) && Math.floor(t * 4) % 2 ? '▍' : '');
+    $('kick1').style.transform = `translateY(${-drop(t, T(7.75), 0.28) * 1.5}px)`;
+
+    // C: modes. Slot rolls one word per morph; width squashes while it travels.
+    show('L-modes', t >= T(8) && t < T(16) + 0.2);
+    $('kick2').textContent = type('natively multimodal', t, T(8.5), 50);
+    $('kick2').style.transform = `translateY(${-drop(t, T(15.5), 0.3) * 1.2}px)`;
+    let idx = 0, squash = 0;
+    MORPHS.slice(1, 5).forEach(([b]) => { const k = progress(t, T(b) - 0.16, 0.3); idx += ease.outExpo(k); squash = max(squash, sin(PI * k)); });
+    const col = $('slotcol');
+    col.style.display = 'block';
+    col.style.transform = `translateY(${-idx * 1.12 + (rise(col, t, T(8.5), 0.34) + drop(t, T(15.5), 0.3)) / 100 * 1.12}em)`;
+    const exiting = t >= T(15.5) - 0.12;
+    slotWords.forEach((w, i) => { w.style.visibility = exiting && i !== Math.round(idx) ? 'hidden' : 'inherit'; });
+    slotWords.forEach((w, i) => fvs(w, lerp(560, 760, squash * (1 - min(1, Math.abs(i - idx)))), lerp(100, 55, squash)));
+    const active = Math.round(idx);
+    segs.forEach((s, i) => {
+      const k = i < active ? 1 : i === active ? ease.outExpo(progress(t, (i === 0 ? T(8.5) : T(MORPHS[i][0])) - 0.12, 0.35)) : 0;
+      s.style.background = `linear-gradient(90deg, #4796e3 ${k * 100}%, #2a2d36 ${k * 100}%)`;
+      s.style.transform = `scaleX(${1 - drop(t, T(15.5) + i * 0.03, 0.3) / 110})`;
+    });
+    $('count').textContent = t >= T(8.5) ? `0${active + 1} / 05` : '';
+    $('count').style.transform = `translateY(${drop(t, T(15.5), 0.3) * 2}px)`;
+
+    // D: light section.
+    show('L-light', t >= T(18) - 0.12 && t < T(24));
+    const one = $('one').firstChild, every = $('every').firstChild;
+    one.style.transform = `translateY(${rise(one, t, T(18))}%)`;
+    fvs(one, lerp(900, 560, ease.outCubic(progress(t, T(18), 0.5))), lerp(60, 100, ease.outExpo(progress(t, T(18) - 0.1, 0.4))));
+    every.style.transform = `translateY(${rise(every, t, T(19))}%)`;
+    fvs(every, lerp(900, 560, ease.outCubic(progress(t, T(19), 0.5))), lerp(60, 100, ease.outExpo(progress(t, T(19) - 0.1, 0.4))));
+    tiles.forEach((d, i) => {
+      const t0 = T(20 + i * 0.5) - 0.1, k = progress(t, t0, 0.42);
+      d.style.transform = `rotateX(${(1 - ease.outBack(k)) * -95}deg) translateY(${(1 - ease.outExpo(k)) * 40}px)`;
+      d.style.visibility = k > 0 ? 'inherit' : 'hidden';
+      d.querySelectorAll('svg *').forEach((p, n) => { p.style.strokeDasharray = '1 1'; p.style.strokeDashoffset = 1 - ease.inOutCubic(progress(t, t0 + 0.12 + n * 0.06, 0.4)); });
+    });
+
+    // E: rapid fire, one composition per beat.
+    show('L-see', t >= T(24) && t < T(25)); slamWord('L-see', t, T(24));
+    show('L-hear', t >= T(25) && t < T(26)); slamWord('L-hear', t, T(25));
+    show('L-read', t >= T(26) && t < T(27)); slamWord('L-read', t, T(26));
+    $('pcol').style.transform = `translateY(${-((t - T(26)) * 260 + 40 * ease.outExpo(progress(t, T(26), 0.3)))}px)`;
+    show('L-code', t >= T(27) && t < T(27.5)); slamWord('L-code', t, T(27));
+
+    // F: end card. Wordmark lands with the collision; tagline types on at b29.5.
+    show('L-end', t >= T(28) - 0.1);
+    wm2.forEach((s, i) => {
+      const hit = T(28) + i * 0.035;
+      s.style.transform = `translateY(${rise(s, t, hit, 0.4)}%)`;
+      fvs(s, lerp(900, 500, ease.outCubic(progress(t, hit, 0.6))), lerp(70, 100, ease.outExpo(progress(t, hit - 0.1, 0.5))));
+    });
+    const tag = 'One model. Every mode.';
+    $('tag').textContent = type(tag, t, T(29.5), 40) + (t >= T(29.5) && Math.floor(t * 3.2) % 2 ? '▍' : '');
+  };
+</script>
+</body>
+</html>
