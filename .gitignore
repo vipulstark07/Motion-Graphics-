@@ -1,2 +1,3 @@
 node_modules/
 films/*/out/
+films/*/capture/

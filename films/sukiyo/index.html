@@ -1,0 +1,308 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>4G Construction — Website by Sukiyo Designs</title>
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>
+  /* The site's own system: Instrument Serif (display) + Hanken Grotesk (UI and sans display),
+     warm ink / paper / stone, one accent (#E1251B). Every block hangs off a 120px left axis. */
+  :root {
+    --ink: #1b1a18; --paper: #f2efe9; --stone: #ddd8ce; --rule: #d9d4ca; --mute: #6f6a62; --mute2: #a8a298; --red: #e1251b;
+    --serif: 'Instrument Serif', Georgia, serif;
+    --sans: 'Hanken Grotesk', system-ui, sans-serif;
+  }
+  html, body { margin: 0; background: var(--ink); overflow: hidden; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--ink); perspective: 2400px; perspective-origin: 50% 50%; font-family: var(--sans); }
+  .scene { position: absolute; inset: 0; overflow: hidden; transform-style: preserve-3d; perspective: 2400px; }
+  #c { position: absolute; inset: 0; }
+  .mask { position: absolute; overflow: hidden; white-space: nowrap; }
+  .mask > span { display: block; }
+  .eyebrow { font: 500 28px/1 var(--sans); letter-spacing: 0.32em; text-transform: uppercase; }
+
+  /* devices: generic, no manufacturer details */
+  .device { position: absolute; left: 0; top: 0; transform-style: preserve-3d; transform-origin: 0 0; }
+  .lap .bezel { position: relative; padding: 18px; background: #121110; border-radius: 30px; box-shadow: 0 70px 140px -30px rgba(27,26,24,.45), inset 0 0 0 2px #2b2926; }
+  .lap .base { position: absolute; left: -7%; width: 114%; top: calc(100% - 4px); height: 30px; border-radius: 4px 4px 22px 22px; background: linear-gradient(#3a3834, #1f1e1b 55%, #0e0d0c); }
+  .phone .bezel { position: relative; padding: 13px; background: #121110; border-radius: 62px; box-shadow: 0 60px 120px -30px rgba(27,26,24,.5), inset 0 0 0 2px #2b2926; }
+  .screen { display: block; border-radius: 10px; }
+  .phone .screen { border-radius: 50px; }
+  .cam { position: absolute; left: 50%; top: 22px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: #050505; }
+
+  /* hero headline, in site coordinates (1440 x 900) inside the laptop screen */
+  #h1 { position: absolute; left: 18px; top: 18px; width: 1440px; height: 900px; pointer-events: none; color: var(--paper); }
+  #h1 .mask { left: 57.6px; height: 113px; font-size: 109.44px; line-height: 107.25px; font-weight: 300; }
+  #h1 .sans { letter-spacing: -4.92px; }
+  #h1 .serif { font-family: var(--serif); font-style: italic; letter-spacing: -2.19px; font-weight: 400; }
+
+  /* work */
+  #S3 { background: var(--ink); color: var(--paper); }
+  .card { position: absolute; top: 520px; width: 620px; height: 430px; overflow: hidden; border-radius: 4px; background: #2b2926; }
+  .card img { position: absolute; top: 0; left: -40px; width: 700px; height: 430px; object-fit: cover; }
+  .cap { position: absolute; top: 976px; width: 620px; font: 400 30px/1.2 var(--sans); }
+  .cap small { float: right; font-size: 22px; color: var(--mute2); letter-spacing: 0.04em; padding-top: 6px; }
+
+  #S4, #S5, #S2 { background: var(--paper); }
+  #S5 { color: var(--ink); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" width="1920" height="1080"></canvas>
+
+  <!-- S2: laptop (its screen is also the full-frame hero shot) + phone -->
+  <div class="scene" id="S2">
+    <div class="device lap" id="lap">
+      <div class="bezel"><canvas class="screen" id="lapc" width="2880" height="1800" style="width:1440px;height:900px"></canvas>
+        <div id="h1">
+          <div class="mask sans" style="top:502.6px"><span>Get the</span></div>
+          <div class="mask serif" style="top:616.4px"><span>4th generation</span></div>
+          <div class="mask sans" style="top:730.2px"><span>advantage.</span></div>
+        </div>
+      </div>
+      <div class="base"></div>
+    </div>
+    <div class="device phone" id="phone">
+      <div class="bezel"><canvas class="screen" id="phc" width="780" height="1688" style="width:390px;height:844px"></canvas><div class="cam"></div></div>
+    </div>
+  </div>
+
+  <!-- S3: selected work, rebuilt at film scale -->
+  <div class="scene" id="S3">
+    <div class="eyebrow" style="position:absolute;left:124px;top:104px;color:var(--mute2)">Selected work</div>
+    <div class="mask" id="w1" style="left:116px;top:142px;font:300 140px/1.05 var(--sans);letter-spacing:-0.045em;height:150px"><span>Built to last</span></div>
+    <div class="mask" id="w2" style="left:116px;top:282px;font:400 150px/1.05 var(--serif);font-style:italic;letter-spacing:-0.02em;height:168px"><span>a generation.</span></div>
+    <div id="count" style="position:absolute;right:120px;top:150px;font:300 64px/1 var(--sans);letter-spacing:-0.03em"></div>
+    <div id="cards"></div>
+  </div>
+
+  <!-- S4: the same site on a phone and a laptop -->
+  <div class="scene" id="S4">
+    <div class="device lap" id="lap2">
+      <div class="bezel"><img class="screen" src="assets/desktop-philosophy.webp" style="width:1440px;height:900px"></div>
+      <div class="base"></div>
+    </div>
+    <div class="device phone" id="phone2">
+      <div class="bezel"><canvas class="screen" id="phc2" width="780" height="1688" style="width:390px;height:844px"></canvas><div class="cam"></div></div>
+    </div>
+  </div>
+
+  <!-- S5: end card -->
+  <div class="scene" id="S5">
+    <div id="lockup" style="position:absolute;left:120px;top:318px;width:1180px;height:183px">
+      <div id="mark" style="position:absolute;inset:0;background:url(assets/logo.png) 0 0/1180px 183px no-repeat"></div>
+      <div id="word" style="position:absolute;inset:0;background:url(assets/logo.png) 0 0/1180px 183px no-repeat"></div>
+    </div>
+    <div id="rule" style="position:absolute;left:120px;top:640px;width:1680px;height:2px;background:var(--rule);transform-origin:0 0"></div>
+    <div class="mask eyebrow" id="by" style="left:124px;top:684px;color:var(--mute);height:32px"><span>Website by</span></div>
+    <div class="mask" id="sukiyo" style="left:116px;top:722px;font:400 124px/1.05 var(--serif);font-style:italic;letter-spacing:-0.01em;height:140px"><span>Sukiyo Designs</span></div>
+  </div>
+</div>
+
+<script type="module">
+  // Render contract: seek(t) sets every property from t alone. The hero video is
+  // seeked to a frame derived from t; nothing is remembered between frames.
+  import { clamp, lerp, progress, ease } from '/lib/time.js';
+
+  const film = await (await fetch('film.json')).json();
+  const grid = await (await fetch('beats.json')).json();
+  const beats = grid.beats, SPB = 60 / grid.bpm, last = beats.length - 1;
+  const B = (x) => {
+    if (x <= 0) return x * SPB;
+    if (x >= last) return beats[last] + (x - last) * SPB;
+    const i = Math.floor(x);
+    return beats[i] + (x - i) * (beats[i + 1] - beats[i]);
+  };
+  const { PI, exp, log, max, min, round, floor } = Math;
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- assets ----------
+  const img = (src) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+  const seqLoad = async (dir, n) => Promise.all(Array.from({ length: n }, (_, i) => img(`assets/${dir}/${String(i).padStart(3, '0')}.webp`)));
+  const dYs = await (await fetch('assets/desktop/scroll.json')).json();
+  const mYs = await (await fetch('assets/mobile/scroll.json')).json();
+  const [dSeq, mSeq, heroNoHead, mHero] = await Promise.all([
+    seqLoad('desktop', dYs.length), seqLoad('mobile', mYs.length), img('assets/desktop-hero-2x-nohead.webp'), img('assets/mobile-hero.webp'),
+  ]);
+  const vid = document.createElement('video');
+  vid.muted = true; vid.preload = 'auto'; vid.src = 'assets/hero.webm';
+  await new Promise((r) => vid.addEventListener('loadeddata', r, { once: true }));
+  const VFPS = 24000 / 1001;
+  async function videoAt(tv) {
+    const ft = (floor(clamp(tv, 0, 16.2) * VFPS) + 0.5) / VFPS; // centre of a frame: no boundary ambiguity
+    if (Math.abs(vid.currentTime - ft) < 1e-4 && !vid.seeking) return;
+    const done = new Promise((r) => vid.addEventListener('seeked', r, { once: true }));
+    vid.currentTime = ft;
+    await done;
+  }
+  await Promise.all([document.fonts.load("italic 400 100px 'Instrument Serif'"), document.fonts.load("300 100px 'Hanken Grotesk'"), document.fonts.load("400 100px 'Instrument Serif'")]);
+
+  // Cover-fit the video into a rect (the site uses object-fit: cover).
+  function cover(ctx, x, y, w, h) {
+    const s = max(w / vid.videoWidth, h / vid.videoHeight), dw = vid.videoWidth * s, dh = vid.videoHeight * s;
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    ctx.drawImage(vid, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+    ctx.restore();
+  }
+  const PAPER = '#f2efe9', INK = '#1b1a18';
+
+  // A scrolled page: paper, the hero video where the hero sits, then the nearest
+  // capture shifted by the remainder so motion is continuous between captures.
+  function page(ctx, seq, ys, s, w, h, video) {
+    ctx.fillStyle = PAPER; ctx.fillRect(0, 0, w, h);
+    if (video && s < h) { ctx.fillStyle = INK; ctx.fillRect(0, -s, w, h); cover(ctx, 0, -s, w, h); }
+    let k = 0;
+    while (k + 1 < ys.length && ys[k + 1] <= s) k++;
+    ctx.drawImage(seq[k], 0, -(s - ys[k]), w, h);
+  }
+
+  // ---------- hook: "4th" as a window onto the footage ----------
+  const cv = $('c'), cx = cv.getContext('2d');
+  const mk = document.createElement('canvas'); mk.width = 1920; mk.height = 1080;
+  const mx = mk.getContext('2d');
+  const HOOK = { size: 900, x: 150, y: 860 };
+  mx.font = `italic 400 ${HOOK.size}px 'Instrument Serif'`;
+  // Thickest point of the glyphs: the camera dives into it, so the footage fills the frame.
+  const P = (() => {
+    mx.clearRect(0, 0, 1920, 1080); mx.fillStyle = '#fff'; mx.fillText('4th', HOOK.x, HOOK.y);
+    const d = mx.getImageData(0, 0, 1920, 1080).data, on = (x, y) => x >= 0 && y >= 0 && x < 1920 && y < 1080 && d[(y * 1920 + x) * 4 + 3] > 128;
+    let best = [960, 540, 0];
+    for (let y = 0; y < 1080; y += 8) for (let x = 0; x < 1920; x += 8) {
+      if (!on(x, y)) continue;
+      let r = 0;
+      grow: for (; r < 260; r += 4) for (let a = 0; a < 16; a++) if (!on(round(x + r * Math.cos(a * PI / 8)), round(y + r * Math.sin(a * PI / 8)))) break grow;
+      if (r > best[2]) best = [x, y, r];
+    }
+    return best;
+  })();
+
+  // ---------- S3 cards ----------
+  const WORK = [['img-02', 'Open-plan living', 'New build'], ['img-03', 'Kitchen remodel', 'Renovation'], ['img-04', 'Fenton Township', 'Board room'],
+    ['img-05', 'Epoxy countertops', 'Kitchen surfaces'], ['img-06', 'Kitchen cabinetry', 'Install'], ['img-07', 'Roof framing', 'New build'], ['img-09', 'Backyard pavilion', 'Outdoor']];
+  const CW = 620, GAP = 36;
+  const cards = WORK.map(([f, title, kind], i) => {
+    const c = document.createElement('div'); c.className = 'card'; c.innerHTML = `<img src="assets/photos/${f}.jpg">`;
+    const cap = document.createElement('div'); cap.className = 'cap'; cap.innerHTML = `${title}<small>${kind}</small>`;
+    $('cards').append(c, cap); return [c, cap];
+  });
+  await Promise.all([...document.querySelectorAll('#cards img, #S4 img')].map((i) => i.decode()));
+
+  // ---------- helpers ----------
+  const show = (id, on) => { $(id).style.visibility = on ? 'visible' : 'hidden'; };
+  const rise = (t, beatT, dur = 0.5) => (1 - ease.outExpo(progress(t, beatT - 0.12, dur))) * 110;   // lands on the beat
+  const place = (el, x, y, s, rx = 0, ry = 0, rz = 0) => {
+    el.style.transform = `translate(${x}px, ${y}px) rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${rz}deg) scale(${s}) translate(-50%, -50%)`;
+  };
+  const LAP_W = 1476, LAP_H = 936, PH_W = 416, PH_H = 870;
+  const tv = (t) => 4.0 + t; // the great-room section of the hero footage
+
+  window.seek = async (t) => {
+    await videoAt(tv(t));
+
+    // ===== S1: hook (0 -> b3) =====
+    const hook = t < B(3);
+    $('c').style.visibility = hook ? 'visible' : 'hidden';
+    if (hook) {
+      const k = progress(t, B(2), B(3) - B(2));
+      const drift = 1 + 0.1 * ease.inOutCubic(progress(t, 0, B(2)));
+      const s = drift * exp(log(1500 / (P[2] * 1.1)) * ease.inExpo(k));
+      const qx = lerp(P[0], 960, ease.inOutCubic(k)), qy = lerp(P[1], 540, ease.inOutCubic(k));
+      mx.setTransform(1, 0, 0, 1, 0, 0); mx.clearRect(0, 0, 1920, 1080);
+      mx.setTransform(s, 0, 0, s, qx - s * P[0], qy - s * P[1]);
+      mx.fillStyle = '#fff'; mx.fillText('4th', HOOK.x, HOOK.y);
+      cx.globalCompositeOperation = 'source-over';
+      cx.clearRect(0, 0, 1920, 1080);
+      cover(cx, 0, 0, 1920, 1080);
+      cx.globalCompositeOperation = 'destination-in'; cx.drawImage(mk, 0, 0);
+      cx.globalCompositeOperation = 'destination-over'; cx.fillStyle = INK; cx.fillRect(0, 0, 1920, 1080);
+      cx.globalCompositeOperation = 'source-over';
+      // eyebrow, as on the site
+      const ey = ease.outExpo(progress(t, B(1) - 0.12, 0.6));
+      cx.save(); cx.globalAlpha = 1; cx.beginPath(); cx.rect(120, 975, 900, 50); cx.clip();
+      cx.font = "500 30px 'Hanken Grotesk'"; cx.letterSpacing = '9px'; cx.fillStyle = '#a8a298';
+      cx.fillText('MILLINGTON, MICHIGAN', 124, 1012 + (1 - ey) * 40 + (s - drift) * 0.4);
+      cx.restore();
+    }
+
+    // ===== S2: laptop hero -> pull-back -> scroll; phone joins (b3 -> b8) =====
+    const s2 = t >= B(3) && t < B(8);
+    show('S2', s2);
+    if (s2) {
+      const pb = ease.inOutCubic(progress(t, B(4.5), B(5.5) - B(4.5)));
+      const dolly = 1 + 0.045 * ease.inOutCubic(progress(t, B(5.5), B(8) - B(5.5)));
+      place($('lap'), lerp(960, 870, pb), lerp(540, 488, pb), lerp(1440 * 1.3333 / 1440, 0.78, pb) * dolly, 6 * pb, -13 * pb, 0);
+      // screen content
+      const lc = $('lapc').getContext('2d');
+      lc.setTransform(2, 0, 0, 2, 0, 0);
+      const sp = ease.inOutCubic(progress(t, B(4.75), B(6.25) - B(4.75)));
+      if (sp <= 0) {
+        lc.fillStyle = INK; lc.fillRect(0, 0, 1440, 900); cover(lc, 0, 0, 1440, 900);
+        lc.drawImage(heroNoHead, 0, 0, 1440, 900);
+      } else page(lc, dSeq, dYs, sp * dYs[dYs.length - 1], 1440, 900, true);
+      // live headline until the scroll takes over (the captures carry the same headline)
+      show('h1', sp <= 0);
+      [0, 1, 2].forEach((i) => { $('h1').children[i].firstChild.style.transform = `translateY(${rise(t, B(3 + i / 3), 0.55)}%)`; });
+      // phone
+      const pin = ease.outExpo(progress(t, B(5.5) - 0.15, 0.7));
+      place($('phone'), 1530 + (1 - pin) * 120, 600 + (1 - pin) * 1100, 0.92 * dolly, 4, 14, 2);
+      const pc = $('phc').getContext('2d');
+      pc.setTransform(2, 0, 0, 2, 0, 0);
+      pc.fillStyle = INK; pc.fillRect(0, 0, 390, 844); cover(pc, 0, 0, 390, 844); pc.drawImage(mHero, 0, 0, 390, 844);
+    }
+
+    // ===== S3: selected work (b8 -> b11) =====
+    const s3 = t >= B(8) && t < B(11);
+    show('S3', s3);
+    if (s3) {
+      $('S3').style.transform = `scale(${1 + 0.03 * progress(t, B(8), B(11) - B(8))})`;
+      $('w1').firstChild.style.transform = `translateY(${rise(t, B(8))}%)`;
+      $('w2').firstChild.style.transform = `translateY(${rise(t, B(8.5))}%)`;
+      let idx = 0;
+      for (const b of [9, 9.75, 10.5]) idx += ease.outExpo(progress(t, B(b) - 0.18, 0.5));
+      $('count').innerHTML = `0${round(idx) + 1}<span style="color:var(--mute2)"> / 0${WORK.length}</span>`;
+      cards.forEach(([c, cap], i) => {
+        const enter = (1 - ease.outExpo(progress(t, B(8) - 0.1 + i * 0.05, 0.7))) * 1100;
+        const x = 120 + i * (CW + GAP) - idx * (CW + GAP) + enter;
+        c.style.transform = `translateX(${x}px)`;
+        cap.style.transform = `translateX(${x}px)`;
+        c.firstChild.style.transform = `translateX(${clamp((i - idx) * -24, -40, 40)}px)`;
+      });
+    }
+
+    // ===== S4: phone + laptop, then a push into the phone (b11 -> b16) =====
+    const s4 = t >= B(11) && t < B(16);
+    show('S4', s4);
+    if (s4) {
+      const pin = ease.outExpo(progress(t, B(11) - 0.12, 0.75));
+      const push = progress(t, B(14.5), B(16) - B(14.5));
+      const straight = ease.inOutCubic(clamp(push * 1.6));
+      const zoom = exp(log(80) * ease.inExpo(push));
+      const sc = 1.12 * zoom;
+      const A = [300 - 195, 255 - 422]; // empty paper right of "expediency.", relative to the phone's centre
+      const px = lerp(660, 960 - sc * A[0], ease.inOutCubic(push)), py = lerp(560 + (1 - pin) * 1200, 540 - sc * A[1], ease.inOutCubic(push));
+      place($('phone2'), px, py, sc, 0, 16 * (1 - straight), -3 * (1 - straight));
+      const lin = ease.outExpo(progress(t, B(12) - 0.12, 0.8));
+      place($('lap2'), 1390 + (1 - lin) * 1000 + ease.inCubic(push) * 1400, 520, 0.56, 4, -16, 0);
+      const pc = $('phc2').getContext('2d');
+      pc.setTransform(2, 0, 0, 2, 0, 0);
+      page(pc, mSeq, mYs, lerp(mYs[0], mYs[mYs.length - 1], ease.inOutCubic(progress(t, B(11.25), B(14.25) - B(11.25)))), 390, 844, false);
+    }
+
+    // ===== S5: end card (b16 -> end) =====
+    const s5 = t >= B(16);
+    show('S5', s5);
+    if (s5) {
+      $('S5').style.transform = `scale(${1 + 0.025 * ease.inOutCubic(progress(t, B(16), film.duration - B(16)))})`;
+      const m = ease.outExpo(progress(t, B(16) - 0.2, 0.7)), w = ease.outExpo(progress(t, B(16.5) - 0.12, 0.9));
+      const MARK = 0.175; // the "4" mark occupies the first 17.5% of the logo
+      $('mark').style.clipPath = `inset(${(1 - m) * 100}% ${(1 - MARK) * 100}% 0 0)`;
+      $('word').style.clipPath = `inset(0 ${(1 - MARK) * 100 * (1 - w)}% 0 ${MARK * 100}%)`;
+      $('word').style.transform = `translateX(${(1 - w) * -40}px)`;
+      $('rule').style.transform = `scaleX(${ease.inOutCubic(progress(t, B(17.5), B(18.75) - B(17.5)))})`;
+      $('by').firstChild.style.transform = `translateY(${rise(t, B(18.5), 0.6)}%)`;
+      $('sukiyo').firstChild.style.transform = `translateY(${rise(t, B(18.75), 0.7)}%)`;
+    }
+  };
+</script>
+</body>
+</html>
