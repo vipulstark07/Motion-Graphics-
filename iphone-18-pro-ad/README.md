@@ -54,7 +54,7 @@ npx serve .            # then open the printed URL
 
 # Regenerate the score (needs Python 3 + NumPy)
 python3 tools/score.py
-ffmpeg -y -i assets/audio/score.wav -c:a aac -b:a 192k assets/audio/score.m4a
+ffmpeg -y -i assets/audio/score.wav -c:a libmp3lame -b:a 192k assets/audio/score.mp3
 
 # Render the MP4 (needs Node, Playwright's Chromium and ffmpeg)
 node tools/render.mjs --video --out out/iphone-18-pro-film.mp4

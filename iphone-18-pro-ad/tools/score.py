@@ -6,7 +6,7 @@ every cut lands on the 120 BPM grid, the four aperture stops get a
 mechanical click, and the end card resolves on a long Fmaj9 bloom.
 
     python3 tools/score.py            # writes assets/audio/score.wav
-    ffmpeg -i assets/audio/score.wav -c:a aac -b:a 192k assets/audio/score.m4a
+    ffmpeg -i assets/audio/score.wav -c:a libmp3lame -b:a 192k assets/audio/score.mp3
 """
 import json
 import os

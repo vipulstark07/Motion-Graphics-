@@ -39,7 +39,7 @@ const workers = Number(opt('workers', Math.max(1, Math.min(3, os.cpus().length -
 
 const TYPES = {
   '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.woff2': 'font/woff2',
-  '.m4a': 'audio/mp4', '.wav': 'audio/wav', '.png': 'image/png',
+  '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.png': 'image/png',
 };
 function serve() {
   return new Promise((resolve) => {
@@ -114,7 +114,7 @@ try {
     );
     console.log('\nencoding…');
     const wav = path.join(ROOT, 'assets/audio/score.wav');
-    const audioPath = fs.existsSync(wav) ? wav : path.join(ROOT, 'assets/audio/score.m4a');
+    const audioPath = fs.existsSync(wav) ? wav : path.join(ROOT, 'assets/audio/score.mp3');
     const audioArgs = fs.existsSync(audioPath) ? ['-ss', String(from), '-t', String(to - from), '-i', audioPath] : [];
     const ff = spawn('ffmpeg', [
       '-y', '-loglevel', 'error', '-framerate', String(fps), '-i', path.join(tmp, 'f%05d.png'),

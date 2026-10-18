@@ -40,7 +40,7 @@ for (const file of files) {
 
 let html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const font = `data:font/woff2;base64,${read('assets/fonts/InterVariable-opsz.woff2').toString('base64')}`;
-const audio = `data:audio/mp4;base64,${read('assets/audio/score.m4a').toString('base64')}`;
+const audio = `data:audio/mpeg;base64,${read('assets/audio/score.mp3').toString('base64')}`;
 const timeline = JSON.stringify(JSON.parse(read('assets/timeline.json')));
 
 const swap = (from, to) => {
@@ -50,7 +50,7 @@ const swap = (from, to) => {
 swap(/<link rel="preload"[^>]*>\n\s*/.exec(html)[0], '');
 swap('url("assets/fonts/InterVariable-opsz.woff2")', `url("${font}")`);
 swap(/<script type="importmap">[\s\S]*?<\/script>/.exec(html)[0], `<script type="importmap">${JSON.stringify({ imports })}</script>`);
-swap('src="assets/audio/score.m4a"', `src="${audio}"`);
+swap('src="assets/audio/score.mp3"', `src="${audio}"`);
 swap('<script type="module" src="js/film.js"></script>', `<script>window.__TIMELINE = ${timeline};</script>\n  <script type="module">import 'app/film.js';</script>`);
 
 const out = path.join(ROOT, 'dist/iphone-18-pro-film.html');
