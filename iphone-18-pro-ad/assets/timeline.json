@@ -1,0 +1,94 @@
+{
+  "duration": 48,
+  "fps": 30,
+  "shots": [
+    {
+      "id": "glint",
+      "start": 0,
+      "end": 4.5
+    },
+    {
+      "id": "hero",
+      "start": 4.5,
+      "end": 9.5
+    },
+    {
+      "id": "aperture",
+      "start": 9.5,
+      "end": 17.5
+    },
+    {
+      "id": "cameras",
+      "start": 17.5,
+      "end": 23.5
+    },
+    {
+      "id": "chip",
+      "start": 23.5,
+      "end": 30
+    },
+    {
+      "id": "display",
+      "start": 30,
+      "end": 36
+    },
+    {
+      "id": "finishes",
+      "start": 36,
+      "end": 42
+    },
+    {
+      "id": "endcard",
+      "start": 42,
+      "end": 48
+    }
+  ],
+  "aperture": [
+    {
+      "t": 11.5,
+      "from": 1.48,
+      "to": 1.8
+    },
+    {
+      "t": 13.0,
+      "from": 1.8,
+      "to": 2.8
+    },
+    {
+      "t": 14.5,
+      "from": 2.8,
+      "to": 4.0
+    },
+    {
+      "t": 16.0,
+      "from": 4.0,
+      "to": 1.48
+    }
+  ],
+  "apertureMove": 0.5,
+  "fades": [
+    {
+      "type": "in",
+      "start": 0,
+      "end": 1.8
+    },
+    {
+      "type": "dip",
+      "start": 23.15,
+      "mid": 23.5,
+      "end": 23.85
+    },
+    {
+      "type": "dip",
+      "start": 29.65,
+      "mid": 30,
+      "end": 30.35
+    },
+    {
+      "type": "out",
+      "start": 47.0,
+      "end": 48
+    }
+  ],
+  "bpm": 120
+}

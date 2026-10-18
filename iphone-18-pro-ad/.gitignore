@@ -1,0 +1,4 @@
+# Intermediate lossless score; regenerate with `python3 tools/score.py`.
+assets/audio/score.wav
+stills/
+node_modules/
