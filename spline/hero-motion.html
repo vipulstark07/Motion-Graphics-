@@ -1,0 +1,78 @@
+<!doctype html>
+<!--
+  Motion layer for the "Architectural Residence Hero" Spline scene.
+  This is the exact document attached to the scene's HTML layer (Code tab).
+  It drives the "Residence" group via the injected `spline` bridge:
+  slow sway around the hero angle, gentle float, eased mouse parallax,
+  a soft entrance, and no motion when the user prefers reduced motion.
+-->
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<script>
+(async () => {
+  await spline.ready;
+  const obj = await spline.findObjectByName('Residence');
+  if (!obj) { console.warn('Residence group not found'); return; }
+  const id = obj.id;
+  const base = { p: { ...obj.position }, r: { ...obj.rotation } };
+
+  // Tunables: keep the motion elegant and restrained
+  const SWAY_DEG = 14, SWAY_PERIOD = 26;    // slow oscillation around the hero angle
+  const FLOAT_AMP = 7, FLOAT_PERIOD = 7;    // gentle levitation
+  const PARALLAX_YAW = 7, PARALLAX_PITCH = 3.5;
+  const PARALLAX_EASE = 2.6;                // higher = snappier follow
+  const INTRO = 2.4;                        // entrance seconds
+
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const amp = reduce ? 0 : 1;
+
+  const clamp01 = (x) => Math.min(1, Math.max(0, x));
+  const easeOutCubic = (p) => 1 - Math.pow(1 - p, 3);
+  const TAU = Math.PI * 2;
+
+  let tx = 0, ty = 0, px = 0, py = 0;
+  const onMove = (e) => {
+    tx = (e.clientX / window.innerWidth) * 2 - 1;
+    ty = (e.clientY / window.innerHeight) * 2 - 1;
+  };
+  window.addEventListener('pointermove', onMove, { passive: true });
+  window.addEventListener('pointerleave', () => { tx = 0; ty = 0; });
+  document.addEventListener('mouseleave', () => { tx = 0; ty = 0; });
+
+  const t0 = performance.now();
+  let last = t0;
+  function tick(now) {
+    try {
+      const t = (now - t0) / 1000;
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      const k = 1 - Math.exp(-dt * PARALLAX_EASE);
+      px += (tx - px) * k; py += (ty - py) * k;
+
+      const intro = easeOutCubic(clamp01(t / INTRO));
+      const idle = clamp01((t - INTRO * 0.6) / 2.5);
+
+      const yaw = base.r.y
+        + (1 - intro) * -18
+        + Math.sin(t * TAU / SWAY_PERIOD) * SWAY_DEG * idle * amp
+        + px * PARALLAX_YAW * amp;
+      const pitch = base.r.x
+        + Math.sin(t * TAU / 9.3) * 0.5 * idle * amp
+        + py * PARALLAX_PITCH * amp;
+      const roll = base.r.z + Math.sin(t * TAU / 11.7 + 1.1) * 0.6 * idle * amp;
+      const y = base.p.y
+        - (1 - intro) * 60
+        + Math.sin(t * TAU / FLOAT_PERIOD) * FLOAT_AMP * idle * amp;
+
+      spline.updateObject(id, {
+        position: { x: base.p.x, y: y, z: base.p.z },
+        rotation: { x: pitch, y: yaw, z: roll }
+      });
+    } catch (err) { console.error(err); }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
