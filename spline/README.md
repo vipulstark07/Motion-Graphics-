@@ -59,16 +59,40 @@ the Spline file's Code tab. It drives the `Residence` group:
 Play controls are disabled (`playControls('none')`) so page scrolling never
 zooms or orbits the model.
 
-## Remaining steps (in the Spline editor)
+## Pink lighting version (current)
 
-1. **Fix the hero camera:** the play camera (`Hero Camera`) is mis-aimed, so
-   Play/export currently shows only background. Select it and aim it at the
-   model from a raised three-quarter view: azimuth ≈ -35°, elevation ≈ 22°,
-   looking at about (0, 150, 0). Or choose your viewport framing in
-   Export → Camera.
-2. **Make the background transparent:** Export → Settings → Background → set
-   alpha to 0 (or toggle "Hide background"). The shadow catcher still
-   grounds the model.
-3. **Publish:** Export → Viewer or Code export. Paste the snippet Spline gives
-   you into the hero section and give the container a fixed aspect ratio.
-   The HTML motion layer ships with the export automatically.
+The scene is now restyled to match the pink neon reference:
+
+- **Pink LED strips** (shared `Pink LED` emissive material) run along the front and right edges of
+  both first-floor slabs, around the penthouse roof, around the plinth and along the pool edge.
+- **3 shadowless pink point lights** wash the soffits, facade and terrace pink. A cyan rim light from
+  the back-right echoes the cyan side of the reference.
+- **Bloom** (threshold 0.9) makes only the LED strips glow; the white surfaces stay crisp.
+- **Materials:** white render (`Concrete` → `#ebe6ec`), light-grey penthouse cladding, smoked glass
+  with a warm interior glow and a pink fresnel rim, a cyan pool, and black frames.
+- **Hero Camera** is fixed. It looks from the front-right (azimuth 35°, elevation 18°) so the
+  cantilever over the pool reads clearly, and it is set as the Play/export camera.
+
+### Web optimisation
+
+| Metric | Value | Spline rating |
+| --- | --- | --- |
+| Objects | 47 (was 101) | good |
+| Polygons | ~1.1k | good |
+| Lights | 5, one shadow-casting | average |
+| Textures | 3 procedural, 512 px | average |
+| Post-processing | 1 (bloom) | good |
+
+The 41 graphite frames, fins, tracks and rails are merged into one mesh (`Graphite Frames & Fins`).
+The 12 timber battens are merged into another (`Timber Batten Screen`).
+
+## Exporting for your website / Claude Design
+
+Open the file, then **Export**:
+
+- **Public URL or Viewer embed:** keeps everything, including the pink lights, bloom glow and the
+  sway/float/mouse-parallax motion. Before exporting, turn off the background (Export → settings →
+  Background / hide background) so the house floats on your site's own gradient.
+- **3D file (GLB / glTF):** gives the geometry and materials, including the glowing pink LED strips,
+  for use in other tools. Spline-only features don't come along: the bloom glow, point-light setup,
+  shadow catcher and HTML motion layer. The receiving tool or site has to recreate those.
