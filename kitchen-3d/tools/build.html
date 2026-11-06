@@ -1,0 +1,19 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Kitchen build</title>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+import { buildKitchen } from '/src/kitchen.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+window.exportKitchen = async () => {
+  const t0 = performance.now();
+  const root = buildKitchen();
+  const t1 = performance.now();
+  const buf = await new GLTFExporter().parseAsync(root, { binary: true });
+  const bytes = new Uint8Array(buf);
+  let bin = ''; const CH = 0x8000;
+  for (let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  return { b64: btoa(bin), stats: root.userData.stats, buildMs: t1 - t0, exportMs: performance.now() - t1 };
+};
+window.__ready = true;
+</script></body></html>

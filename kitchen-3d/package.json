@@ -1,0 +1,17 @@
+{
+  "name": "kitchen-3d",
+  "description": "Procedural, web-optimised 3D model of a luxury kitchen (GLB) for a website hero section.",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "render": "DPR=2 node tools/render.mjs hero,left,close,cab,top"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
+    "meshoptimizer": "^1.3.0",
+    "three": "0.170.0"
+  },
+  "private": true,
+  "type": "module"
+}

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kitchen 3D Viewer</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f4f2ef; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; font: 500 13px/1 system-ui, sans-serif; letter-spacing: .12em; color: #8c837b; text-transform: uppercase; transition: opacity .6s; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="loading">Loading kitchen…</div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const params = new URLSearchParams(location.search);
+const MODEL = params.get('model') || '../dist/kitchen.glb';
+const VIEW = params.get('view') || 'hero';
+
+// ---------- renderer
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf4f2ef);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.42;
+
+// ---------- lights
+const key = new THREE.DirectionalLight(0xfff4e8, 1.25);
+key.position.set(4.5, 9, 6.5);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+Object.assign(key.shadow.camera, { left: -5.5, right: 5.5, top: 5.5, bottom: -5.5, near: 1, far: 25 });
+key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02; key.shadow.radius = 4;
+scene.add(key);
+scene.add(new THREE.HemisphereLight(0xffffff, 0xe8ded3, 0.2));
+
+// soft shadow of the whole platform onto the page background
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.ShadowMaterial({ opacity: 0.12 }));
+ground.rotation.x = -Math.PI / 2; ground.position.y = -0.161; ground.receiveShadow = true;
+scene.add(ground);
+
+// ---------- camera + controls
+const camera = new THREE.PerspectiveCamera(28, innerWidth / innerHeight, 0.1, 80);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.06;
+controls.minDistance = 4; controls.maxDistance = 18;
+controls.maxPolarAngle = Math.PI * 0.47;
+controls.enablePan = false;
+
+const VIEWS = {
+  hero:  { pos: null, target: [-0.2, 1.15, -0.6] },              // camera stored in the GLB
+  front: { pos: [0.6, 2.6, 9.5], target: [-0.2, 1.1, -0.5] },
+  left:  { pos: [8.2, 3.0, 3.2], target: [-0.3, 1.1, -0.8] },
+  top:   { pos: [5.5, 9.5, 6.5], target: [-0.1, 0.6, -0.4] },
+  close: { pos: [2.6, 1.9, 3.4], target: [-0.6, 1.1, -0.6] },
+  cab:   { pos: [0.4, 1.6, 2.4], target: [-2.2, 1.35, -0.2] },
+};
+
+// ---------- post
+const rt = new THREE.WebGLRenderTarget(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio(), { type: THREE.HalfFloatType, samples: 4 });
+const composer = new EffectComposer(renderer, rt);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.55, 0.4, 1.6);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+// ---------- load
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+loader.load(MODEL, (gltf) => {
+  const root = gltf.scene;
+  root.traverse((o) => {
+    if (o.isMesh) {
+      o.castShadow = !!o.userData.castShadow;
+      o.receiveShadow = !!o.userData.receiveShadow;
+      const m = o.material;
+      if (m.map) m.map.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      if (m.name.startsWith('Glass')) o.renderOrder = 2;
+      if (m.name.startsWith('Glow_')) o.renderOrder = 1;
+    }
+  });
+  scene.add(root);
+
+  // practical lights at the anchors baked into the model (no shadows = cheap)
+  const warm = 0xffbf80;
+  const addPoint = (name, intensity, distance) => {
+    const a = root.getObjectByName(name); if (!a) return;
+    const l = new THREE.PointLight(warm, intensity, distance, 2); a.add(l);
+  };
+  addPoint('Anchor_Pendant_A', 1.6, 3.2);
+  addPoint('Anchor_Pendant_B', 1.8, 3.4);
+  addPoint('Anchor_GlassCabinet', 1.2, 1.6);
+  addPoint('Anchor_UnderCabinet_Left', 1.2, 1.8);
+  addPoint('Anchor_UnderCabinet_Back', 1.2, 1.8);
+
+  const v = VIEWS[VIEW] || VIEWS.hero;
+  const heroCam = gltf.cameras.find((c) => c.name === 'HeroCamera');
+  if (v.pos) camera.position.set(...v.pos);
+  else if (heroCam) { heroCam.updateWorldMatrix(true, false); camera.position.setFromMatrixPosition(heroCam.matrixWorld); camera.fov = heroCam.fov; }
+  controls.target.set(...v.target);
+  camera.updateProjectionMatrix(); controls.update();
+
+  const ld = document.getElementById('loading'); ld.style.opacity = 0; setTimeout(() => ld.remove(), 700);
+  let frames = 0;
+  renderer.setAnimationLoop(() => {
+    controls.update();
+    composer.render();
+    if (++frames === 8) setTimeout(() => {
+      if (params.has('still')) { renderer.setAnimationLoop(null); composer.render(); }
+      window.__rendered = true;
+    }, 800);
+  });
+}, undefined, (e) => { document.getElementById('loading').textContent = 'Failed to load model'; console.error(e); });
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
